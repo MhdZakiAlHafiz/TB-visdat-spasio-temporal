@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Visualisasi Spasial-Temporal Data Konstruksi Indonesia</title>
+
+    <!-- Memuat Library Leaflet.js dan CSS-nya dari CDN -->
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <style>
+      body,
+      html {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #f4f4f9;
+      }
+      .wrapper {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+      }
+      header {
+        padding: 10px 20px;
+        background-color: #0056b3;
+        color: white;
+        text-align: center;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        z-index: 1000;
+      }
+      .main-container {
+        display: flex;
+        flex: 1;
+        overflow: hidden;
+      }
+      .sidebar {
+        width: 280px;
+        padding: 20px;
+        background-color: #ffffff;
+        overflow-y: auto;
+        border-right: 1px solid #ddd;
+        box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+      }
+      .sidebar h2 {
+        margin-top: 0;
+        color: #333;
+        border-bottom: 2px solid #0056b3;
+        padding-bottom: 10px;
+      }
+      .filter-group {
+        margin-bottom: 20px;
+      }
+      .filter-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: bold;
+        color: #555;
+      }
+      .filter-group select {
+        width: 100%;
+        padding: 10px;
+        border-radius: 5px;
+        border: 1px solid #ccc;
+        background-color: #f8f9fa;
+      }
+      #map-container {
+        position: relative;
+        flex: 1;
+        height: 100%;
+      }
+      #map {
+        height: 100%;
+        width: 100%;
+        background-color: #eaf2ff;
+      }
+      .legend {
+        padding: 8px;
+        font: 14px Arial, Helvetica, sans-serif;
+        background: rgba(255, 255, 255, 0.9);
+        box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+        border-radius: 5px;
+      }
+      .legend i {
+        width: 18px;
+        height: 18px;
+        float: left;
+        margin-right: 8px;
+        opacity: 0.9;
+        border: 1px solid #999;
+      }
+      #error-box {
+        position: absolute;
+        top: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #ffcdd2;
+        color: #c62828;
+        border: 1px solid #c62828;
+        padding: 15px;
+        border-radius: 5px;
+        z-index: 2000;
+        display: none;
+        font-weight: bold;
+      }
+      #loading-indicator {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 2000;
+        background: rgba(255, 255, 255, 0.8);
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrapper">
+      <header><h1>Dashboard Data Konstruksi Indonesia</h1></header>
+      <div class="main-container">
+        <div class="sidebar">
+          <h2>Filter Data</h2>
+          <div class="filter-group">
+            <label for="filter-tahun">Pilih Tahun:</label>
+            <select id="filter-tahun">
+              <option value="2023">2023</option>
+              <option value="2022">2022</option>
+              <option value="2021">2021</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label for="filter-jenis">Pilih Jenis Data:</label>
+            <select id="filter-jenis">
+              <option value="upah" data-unit="Ribu Rupiah/Hari">
+                Upah Harian Pekerja
+              </option>
+              <option value="hari_kerja" data-unit="Hari">
+                Rata-rata Hari Kerja
+              </option>
+              <option value="nilai_kontrak" data-unit="Indeks">
+                Indeks Nilai Kontrak
+              </option>
+            </select>
+          </div>
+        </div>
+        <div id="map-container">
+          <div id="map"></div>
+          <div id="error-box"></div>
+          <div id="loading-indicator">Memuat data peta...</div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // --- PERUBAHAN BESAR: DATA DILETAKKAN DI SINI, BUKAN DI API ---
+      // Data ini mensimulasikan output dari database Anda.
+      const allData = {
+        upah: {
+          2021: {
+            ACEH: 135.67,
+            "SUMATERA UTARA": 141.01,
+            "SUMATERA BARAT": 151.05,
+            RIAU: 157.63,
+            JAMBI: 134.59,
+            "SUMATERA SELATAN": 142.02,
+            BENGKULU: 127.06,
+            LAMPUNG: 140.32,
+            "KEPULAUAN BANGKA BELITUNG": 126.87,
+            "KEPULAUAN RIAU": 135.37,
+            "DKI JAKARTA": 133.5,
+            "JAWA BARAT": 155.28,
+            "JAWA TENGAH": 151.15,
+            "DI YOGYAKARTA": 146.17,
+            "JAWA TIMUR": 150.31,
+            BANTEN: 149.75,
+            BALI: 137.22,
+            "NUSA TENGGARA BARAT": 126.33,
+            "NUSA TENGGARA TIMUR": 114.75,
+            "KALIMANTAN BARAT": 146.35,
+            "KALIMANTAN TENGAH": 125.01,
+            "KALIMANTAN SELATAN": 147.69,
+            "KALIMANTAN TIMUR": 151.17,
+            "KALIMANTAN UTARA": 165.88,
+            "SULAWESI UTARA": 134.13,
+            "SULAWESI TENGAH": 114.92,
+            "SULAWESI SELATAN": 150.27,
+            "SULAWESI TENGGARA": 126.83,
+            GORONTALO: 131.52,
+            "SULAWESI BARAT": 126.13,
+            MALUKU: 127.41,
+            "MALUKU UTARA": 138.21,
+            "PAPUA BARAT": 141.46,
+            PAPUA: 131.66,
+          },
+          2022: {
+            ACEH: 140.96,
+            "SUMATERA UTARA": 147.56,
+            "SUMATERA BARAT": 158.19,
+            RIAU: 162.18,
+            JAMBI: 142.1,
+            "SUMATERA SELATAN": 145.36,
+            BENGKULU: 130.98,
+            LAMPUNG: 145.34,
+            "KEPULAUAN BANGKA BELITUNG": 127.77,
+            "KEPULAUAN RIAU": 137.3,
+            "DKI JAKARTA": 143.09,
+            "JAWA BARAT": 163.57,
+            "JAWA TENGAH": 155.96,
+            "DI YOGYAKARTA": 153.91,
+            "JAWA TIMUR": 159.34,
+            BANTEN: 156.97,
+            BALI: 141.46,
+            "NUSA TENGGARA BARAT": 129.26,
+            "NUSA TENGGARA TIMUR": 116.41,
+            "KALIMANTAN BARAT": 149.47,
+            "KALIMANTAN TENGAH": 129.4,
+            "KALIMANTAN SELATAN": 154.24,
+            "KALIMANTAN TIMUR": 157.39,
+            "KALIMANTAN UTARA": 172.47,
+            "SULAWESI UTARA": 139.68,
+            "SULAWESI TENGAH": 120.45,
+            "SULAWESI SELATAN": 152.97,
+            "SULAWESI TENGGARA": 130.79,
+            GORONTALO: 134.89,
+            "SULAWESI BARAT": 130.29,
+            MALUKU: 131.43,
+            "MALUKU UTARA": 143.02,
+            "PAPUA BARAT": 146.94,
+            PAPUA: 135.88,
+          },
+          2023: {
+            ACEH: 143.03,
+            "SUMATERA UTARA": 161.12,
+            "SUMATERA BARAT": 163.18,
+            RIAU: 175.94,
+            JAMBI: 146.87,
+            "SUMATERA SELATAN": 157.35,
+            BENGKULU: 141.23,
+            LAMPUNG: 152.22,
+            "KEPULAUAN BANGKA BELITUNG": 136.74,
+            "KEPULAUAN RIAU": 147.55,
+            "DKI JAKARTA": 153.63,
+            "JAWA BARAT": 177.52,
+            "JAWA TENGAH": 163.42,
+            "DI YOGYAKARTA": 163.85,
+            "JAWA TIMUR": 165.82,
+            BANTEN: 159.56,
+            BALI: 141.06,
+            "NUSA TENGGARA BARAT": 136.5,
+            "NUSA TENGGARA TIMUR": 123.55,
+            "KALIMANTAN BARAT": 157.11,
+            "KALIMANTAN TENGAH": 137.38,
+            "KALIMANTAN SELATAN": 168.1,
+            "KALIMANTAN TIMUR": 172.49,
+            "KALIMANTAN UTARA": 170.65,
+            "SULAWESI UTARA": 144.53,
+            "SULAWESI TENGAH": 124.48,
+            "SULAWESI SELATAN": 158.79,
+            "SULAWESI TENGGARA": 130.94,
+            GORONTALO: 139.55,
+            "SULAWESI BARAT": 132.17,
+            MALUKU: 134.56,
+            "MALUKU UTARA": 146.4,
+            "PAPUA BARAT": 144.62,
+            PAPUA: 137.86,
+          },
+        },
+        hari_kerja: {
+          2021: {
+            ACEH: 125,
+            "SUMATERA UTARA": 128,
+            "SUMATERA BARAT": 133,
+            RIAU: 140,
+            JAMBI: 118,
+            "SUMATERA SELATAN": 129,
+            BENGKULU: 118,
+            LAMPUNG: 127,
+            "KEPULAUAN BANGKA BELITUNG": 117,
+            "KEPULAUAN RIAU": 125,
+            "DKI JAKARTA": 109,
+            "JAWA BARAT": 139,
+            "JAWA TENGAH": 130,
+            "DI YOGYAKARTA": 129,
+            "JAWA TIMUR": 129,
+            BANTEN: 135,
+            BALI: 118,
+            "NUSA TENGGARA BARAT": 112,
+            "NUSA TENGGARA TIMUR": 101,
+            "KALIMANTAN BARAT": 133,
+            "KALIMANTAN TENGAH": 104,
+            "KALIMANTAN SELATAN": 128,
+            "KALIMANTAN TIMUR": 132,
+            "KALIMANTAN UTARA": 138,
+            "SULAWESI UTARA": 113,
+            "SULAWESI TENGAH": 100,
+            "SULAWESI SELATAN": 134,
+            "SULAWESI TENGGARA": 110,
+            GORONTALO: 115,
+            "SULAWESI BARAT": 110,
+            MALUKU: 116,
+            "MALUKU UTARA": 113,
+            "PAPUA BARAT": 120,
+            PAPUA: 116,
+          },
+          2022: {
+            ACEH: 127,
+            "SUMATERA UTARA": 131,
+            "SUMATERA BARAT": 137,
+            RIAU: 141,
+            JAMBI: 121,
+            "SUMATERA SELATAN": 131,
+            BENGKULU: 120,
+            LAMPUNG: 130,
+            "KEPULAUAN BANGKA BELITUNG": 119,
+            "KEPULAUAN RIAU": 127,
+            "DKI JAKARTA": 114,
+            "JAWA BARAT": 144,
+            "JAWA TENGAH": 132,
+            "DI YOGYAKARTA": 132,
+            "JAWA TIMUR": 133,
+            BANTEN: 138,
+            BALI: 120,
+            "NUSA TENGGARA BARAT": 113,
+            "NUSA TENGGARA TIMUR": 103,
+            "KALIMANTAN BARAT": 135,
+            "KALIMANTAN TENGAH": 106,
+            "KALIMANTAN SELATAN": 131,
+            "KALIMANTAN TIMUR": 134,
+            "KALIMANTAN UTARA": 142,
+            "SULAWESI UTARA": 115,
+            "SULAWESI TENGAH": 103,
+            "SULAWESI SELATAN": 136,
+            "SULAWESI TENGGARA": 111,
+            GORONTALO: 117,
+            "SULAWESI BARAT": 112,
+            MALUKU: 119,
+            "MALUKU UTARA": 115,
+            "PAPUA BARAT": 122,
+            PAPUA: 117,
+          },
+          2023: {
+            ACEH: 128,
+            "SUMATERA UTARA": 136,
+            "SUMATERA BARAT": 138,
+            RIAU: 147,
+            JAMBI: 125,
+            "SUMATERA SELATAN": 136,
+            BENGKULU: 125,
+            LAMPUNG: 133,
+            "KEPULAUAN BANGKA BELITUNG": 123,
+            "KEPULAUAN RIAU": 131,
+            "DKI JAKARTA": 119,
+            "JAWA BARAT": 150,
+            "JAWA TENGAH": 136,
+            "DI YOGYAKARTA": 138,
+            "JAWA TIMUR": 136,
+            BANTEN: 139,
+            BALI: 122,
+            "NUSA TENGGARA BARAT": 116,
+            "NUSA TENGGARA TIMUR": 105,
+            "KALIMANTAN BARAT": 140,
+            "KALIMANTAN TENGAH": 110,
+            "KALIMANTAN SELATAN": 133,
+            "KALIMANTAN TIMUR": 139,
+            "KALIMANTAN UTARA": 141,
+            "SULAWESI UTARA": 124,
+            "SULAWESI TENGAH": 105,
+            "SULAWESI SELATAN": 138,
+            "SULAWESI TENGGARA": 109,
+            GORONTALO: 120,
+            "SULAWESI BARAT": 112,
+            MALUKU: 123,
+            "MALUKU UTARA": 117,
+            "PAPUA BARAT": 121,
+            PAPUA: 119,
+          },
+        },
+        nilai_kontrak: {
+          2021: {
+            ACEH: 134.35,
+            "SUMATERA UTARA": 144.12,
+            "SUMATERA BARAT": 147.19,
+            RIAU: 164.06,
+            JAMBI: 129.55,
+            "SUMATERA SELATAN": 150.0,
+            BENGKULU: 123.55,
+            LAMPUNG: 147.28,
+            "KEPULAUAN BANGKA BELITUNG": 133.56,
+            "KEPULAUAN RIAU": 137.62,
+            "DKI JAKARTA": 123.2,
+            "JAWA BARAT": 169.24,
+            "JAWA TENGAH": 152.39,
+            "DI YOGYAKARTA": 167.63,
+            "JAWA TIMUR": 154.51,
+            BANTEN: 166.8,
+            BALI: 138.28,
+            "NUSA TENGGARA BARAT": 129.53,
+            "NUSA TENGGARA TIMUR": 131.61,
+            "KALIMANTAN BARAT": 154.87,
+            "KALIMANTAN TENGAH": 102.28,
+            "KALIMANTAN SELATAN": 153.24,
+            "KALIMANTAN TIMUR": 153.9,
+            "KALIMANTAN UTARA": 162.21,
+            "SULAWESI UTARA": 144.44,
+            "SULAWESI TENGAH": 131.83,
+            "SULAWESI SELATAN": 152.19,
+            "SULAWESI TENGGARA": 128.65,
+            GORONTALO: 138.61,
+            "SULAWESI BARAT": 133.24,
+            MALUKU: 139.8,
+            "MALUKU UTARA": 138.82,
+            "PAPUA BARAT": 143.02,
+            PAPUA: 135.43,
+          },
+          2022: {
+            ACEH: 140.62,
+            "SUMATERA UTARA": 151.96,
+            "SUMATERA BARAT": 154.73,
+            RIAU: 168.91,
+            JAMBI: 136.91,
+            "SUMATERA SELATAN": 154.59,
+            BENGKULU: 128.2,
+            LAMPUNG: 152.93,
+            "KEPULAUAN BANGKA BELITUNG": 137.53,
+            "KEPULAUAN RIAU": 142.62,
+            "DKI JAKARTA": 133.61,
+            "JAWA BARAT": 181.83,
+            "JAWA TENGAH": 160.72,
+            "DI YOGYAKARTA": 178.25,
+            "JAWA TIMUR": 167.06,
+            BANTEN: 175.82,
+            BALI: 140.97,
+            "NUSA TENGGARA BARAT": 132.15,
+            "NUSA TENGGARA TIMUR": 136.72,
+            "KALIMANTAN BARAT": 160.0,
+            "KALIMANTAN TENGAH": 107.06,
+            "KALIMANTAN SELATAN": 159.05,
+            "KALIMANTAN TIMUR": 160.58,
+            "KALIMANTAN UTARA": 169.66,
+            "SULAWESI UTARA": 150.05,
+            "SULAWESI TENGAH": 139.33,
+            "SULAWESI SELATAN": 154.41,
+            "SULAWESI TENGGARA": 133.97,
+            GORONTALO: 142.32,
+            "SULAWESI BARAT": 137.27,
+            MALUKU: 143.73,
+            "MALUKU UTARA": 144.16,
+            "PAPUA BARAT": 148.33,
+            PAPUA: 138.67,
+          },
+          2023: {
+            ACEH: 143.47,
+            "SUMATERA UTARA": 167.53,
+            "SUMATERA BARAT": 159.37,
+            RIAU: 184.2,
+            JAMBI: 142.23,
+            "SUMATERA SELATAN": 168.22,
+            BENGKULU: 140.35,
+            LAMPUNG: 160.44,
+            "KEPULAUAN BANGKA BELITUNG": 149.34,
+            "KEPULAUAN RIAU": 155.63,
+            "DKI JAKARTA": 144.94,
+            "JAWA BARAT": 199.13,
+            "JAWA TENGAH": 168.92,
+            "DI YOGYAKARTA": 191.52,
+            "JAWA TIMUR": 176.1,
+            BANTEN: 178.5,
+            BALI: 140.99,
+            "NUSA TENGGARA BARAT": 140.88,
+            "NUSA TENGGARA TIMUR": 146.96,
+            "KALIMANTAN BARAT": 168.81,
+            "KALIMANTAN TENGAH": 114.68,
+            "KALIMANTAN SELATAN": 174.39,
+            "KALIMANTAN TIMUR": 178.09,
+            "KALIMANTAN UTARA": 167.98,
+            "SULAWESI UTARA": 156.6,
+            "SULAWESI TENGAH": 146.6,
+            "SULAWESI SELATAN": 160.42,
+            "SULAWESI TENGGARA": 133.62,
+            GORONTALO: 148.02,
+            "SULAWESI BARAT": 139.18,
+            MALUKU: 147.39,
+            "MALUKU UTARA": 147.23,
+            "PAPUA BARAT": 145.65,
+            PAPUA: 141.45,
+          },
+        },
+      };
+
+      // --- Inisialisasi Peta dan Variabel Global ---
+      const map = L.map("map").setView([-2.5, 118], 5);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 18,
+        attribution:
+          'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      }).addTo(map);
+
+      let geojsonLayer;
+      let legend = L.control({ position: "bottomright" });
+      const filterTahun = document.getElementById("filter-tahun");
+      const filterJenis = document.getElementById("filter-jenis");
+      const errorBox = document.getElementById("error-box");
+      const loadingIndicator = document.getElementById("loading-indicator");
+
+      // --- Fungsi Helper ---
+      function normalizeProvinsiName(name) {
+        return name
+          .toUpperCase()
+          .replace("KEP. ", "KEPULAUAN ")
+          .replace("D.I. YOGYAKARTA", "DI YOGYAKARTA");
+      }
+
+      function getColor(value, jenis) {
+        const scales = {
+          upah: [110, 125, 140, 155, 170],
+          hari_kerja: [100, 110, 120, 130, 140],
+          nilai_kontrak: [110, 130, 150, 170, 190],
+        };
+        const scale = scales[jenis] || scales["upah"];
+        return value > scale[4]
+          ? "#800026"
+          : value > scale[3]
+          ? "#BD0026"
+          : value > scale[2]
+          ? "#E31A1C"
+          : value > scale[1]
+          ? "#FC4E2A"
+          : value > scale[0]
+          ? "#FD8D3C"
+          : "#FFEDA0";
+      }
+
+      // --- Fungsi Utama untuk Mengambil Data dan Menggambar Peta ---
+      async function updateMap() {
+        loadingIndicator.style.display = "block";
+        errorBox.style.display = "none";
+
+        const tahun = filterTahun.value;
+        const jenis = filterJenis.value;
+        const unit =
+          filterJenis.options[filterJenis.selectedIndex].dataset.unit;
+
+        try {
+          // Hapus panggilan fetch ke API PHP.
+          // Langsung ambil data dari objek `allData` yang sudah ada.
+          const dataApi = allData[jenis][tahun] || {};
+
+          // Ambil data GeoJSON untuk batas wilayah
+          const geojsonResponse = await fetch(
+            "https://raw.githubusercontent.com/superpikar/indonesia-geojson/master/indonesia-province.json"
+          );
+          if (!geojsonResponse.ok)
+            throw new Error("Gagal mengambil data GeoJSON Peta Indonesia.");
+          const dataGeojson = await geojsonResponse.json();
+
+          if (geojsonLayer) map.removeLayer(geojsonLayer);
+
+          geojsonLayer = L.geoJson(dataGeojson, {
+            style: (feature) => {
+              const namaProvinsi = normalizeProvinsiName(
+                feature.properties.state
+              );
+              const nilai = dataApi[namaProvinsi] || 0;
+              return {
+                fillColor: getColor(nilai, jenis),
+                weight: 1.5,
+                opacity: 1,
+                color: "#333",
+                fillOpacity: 0.8,
+              };
+            },
+            onEachFeature: (feature, layer) => {
+              const namaProvinsi = feature.properties.state;
+              const namaNormal = normalizeProvinsiName(namaProvinsi);
+              const nilai =
+                dataApi[namaNormal] !== undefined
+                  ? dataApi[namaNormal]
+                  : "Data tidak tersedia";
+              const popupContent = `<b>${namaProvinsi}</b><br>${jenis
+                .replace("_", " ")
+                .replace(/\b\w/g, (l) =>
+                  l.toUpperCase()
+                )}: <b>${nilai}</b> ${unit}`;
+              layer.bindPopup(popupContent);
+              layer.on({
+                mouseover: (e) => {
+                  e.target.setStyle({ weight: 4, color: "#0056b3" });
+                  e.target.bringToFront();
+                },
+                mouseout: (e) => geojsonLayer.resetStyle(e.target),
+              });
+            },
+          }).addTo(map);
+
+          updateLegend(jenis, unit);
+        } catch (error) {
+          console.error("Terjadi kesalahan saat memuat peta:", error);
+          errorBox.textContent = error.message;
+          errorBox.style.display = "block";
+        } finally {
+          loadingIndicator.style.display = "none";
+        }
+      }
+
+      function updateLegend(jenis, unit) {
+        legend.onAdd = function () {
+          const div = L.DomUtil.create("div", "info legend");
+          const scales = {
+            upah: [0, 110, 125, 140, 155, 170],
+            hari_kerja: [0, 100, 110, 120, 130, 140],
+            nilai_kontrak: [0, 110, 130, 150, 170, 190],
+          };
+          const grades = scales[jenis] || scales["upah"];
+
+          div.innerHTML = `<h4>${jenis
+            .replace("_", " ")
+            .replace(/\b\w/g, (l) => l.toUpperCase())} (${unit})</h4>`;
+          for (let i = 0; i < grades.length - 1; i++) {
+            div.innerHTML += `<i style="background:${getColor(
+              grades[i] + 1,
+              jenis
+            )}"></i> ${grades[i]} &ndash; ${grades[i + 1]}<br>`;
+          }
+          div.innerHTML += `<i style="background:${getColor(
+            grades[grades.length - 1] + 1,
+            jenis
+          )}"></i> > ${grades[grades.length - 1]}`;
+          return div;
+        };
+        if (document.querySelector(".legend"))
+          document.querySelector(".legend").remove();
+        legend.addTo(map);
+      }
+
+      filterTahun.addEventListener("change", updateMap);
+      filterJenis.addEventListener("change", updateMap);
+      document.addEventListener("DOMContentLoaded", updateMap);
+    </script>
+  </body>
+</html>

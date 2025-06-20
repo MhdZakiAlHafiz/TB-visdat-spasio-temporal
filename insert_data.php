@@ -26,7 +26,7 @@ if (!$geojson || !isset($geojson['features'])) {
 
 // Daftar provinsi sesuai urutan
 $provinces = [
-     "Aceh",
+    "Aceh",
     "Sumatera Utara",
     "Sumatera Barat",
     "Riau",
@@ -72,7 +72,8 @@ $conn->query("DELETE FROM provinsi");
 // Masukkan data ke database
 foreach ($geojson['features'] as $index => $feature) {
     $province = $provinces[$index] ?? null;
-    if (!$province || !isset($feature['geometry'])) continue;
+    if (!$province || !isset($feature['geometry']))
+        continue;
 
     // Ambil hanya bagian geometry saja
     $geometry = $feature['geometry'];
