@@ -1,87 +1,83 @@
 <?php
-// Mengatur header agar outputnya adalah JSON dan mengizinkan akses dari domain lain (penting untuk development)
-header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
+// Memuat file konfigurasi database
+require_once 'config.php';
 
-// Menampilkan semua error PHP untuk mempermudah debugging
-ini_set('display_errors', 1);
-error_reporting(E_ALL);
+// Mengatur header HTTP untuk memastikan response adalah JSON dan tidak di-cache oleh browser.
+header('Content-Type: application/json; charset=utf-8');
+header("Cache-Control: no-cache, must-revalidate");
+header("Expires: Sat, 26 Jul 1997 05:00:00 GMT"); // Tanggal di masa lalu
 
-// --- 1. KONFIGURASI DATABASE ---
-$db_host = 'localhost';
-$db_user = 'root';
-$db_pass = ''; // Biasanya kosong untuk instalasi XAMPP default
-$db_name = 'konstruksi';
-
-// --- 2. KONEKSI KE DATABASE DENGAN PENANGANAN ERROR ---
+// Menggunakan blok try-catch-finally untuk penanganan error yang rapi
 try {
-    $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
-    if ($conn->connect_error) {
-        throw new Exception('Koneksi Gagal: ' . $conn->connect_error);
+    // 1. Membuat koneksi ke database
+    $conn = connectDB();
+
+    // 2. Mengambil dan memvalidasi parameter dari URL (filter)
+    $tahun = isset($_GET['tahun']) ? (int) $_GET['tahun'] : 2023; // Default ke 2023
+    $jenis = isset($_GET['jenis']) ? $_GET['jenis'] : 'upah';   // Default ke 'upah'
+
+    // Daftar putih (whitelist) untuk keamanan. Mencegah input sembarangan.
+    $valid_jenis = [
+        'upah' => ['tabel' => 'upah', 'kolom' => 'upah'],
+        'hari_kerja' => ['tabel' => 'hari_kerja', 'kolom' => 'hari_kerja'],
+        'nilai_kontrak' => ['tabel' => 'nilai_kontrak', 'kolom' => 'nilai_kontrak']
+    ];
+
+    if (!array_key_exists($jenis, $valid_jenis)) {
+        throw new Exception("Jenis data yang diminta tidak valid.");
     }
-} catch (Exception $e) {
-    // Jika koneksi gagal, kirim status error HTTP 500 dan pesan yang jelas
-    http_response_code(500);
-    echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
-    exit(); // Hentikan eksekusi
-}
 
-// --- 3. VALIDASI INPUT DARI PENGGUNA ---
-$tahun = isset($_GET['tahun']) ? (int) $_GET['tahun'] : 2023;
-$jenis_data = isset($_GET['jenis']) ? $_GET['jenis'] : 'upah';
+    $tabel = $valid_jenis[$jenis]['tabel'];
+    $kolom_nilai = $valid_jenis[$jenis]['kolom'];
 
-// Daftar putih (whitelist) untuk mencegah SQL Injection pada nama tabel/kolom
-$valid_jenis = [
-    'upah' => ['tabel' => 'upah', 'kolom' => 'upah'],
-    'hari_kerja' => ['tabel' => 'hari_kerja', 'kolom' => 'hari_kerja'],
-    'nilai_kontrak' => ['tabel' => 'nilai_kontrak', 'kolom' => 'nilai_kontrak']
-];
+    // 3. Mempersiapkan dan menjalankan query SQL
+    $sql = "SELECT provinsi, $kolom_nilai AS nilai FROM $tabel WHERE tahun = ?";
+    $stmt = $conn->prepare($sql);
 
-if (!array_key_exists($jenis_data, $valid_jenis)) {
-    // Jika jenis data tidak valid, kirim error 400 Bad Request
-    http_response_code(400);
-    echo json_encode(['status' => 'error', 'message' => 'Jenis data yang diminta tidak valid.']);
-    exit();
-}
+    if ($stmt === false) {
+        throw new Exception("Query preparation failed: " . $conn->error);
+    }
 
-$tabel = $valid_jenis[$jenis_data]['tabel'];
-$kolom_nilai = $valid_jenis[$jenis_data]['kolom'];
+    $stmt->bind_param("i", $tahun);
+    $stmt->execute();
+    $result = $stmt->get_result();
 
-// --- 4. MEMBUAT DAN MENJALANKAN QUERY DENGAN PREPARED STATEMENT ---
-// Ini adalah cara paling aman untuk menjalankan query
-$sql = "SELECT provinsi, $kolom_nilai AS nilai FROM $tabel WHERE tahun = ?";
-
-$stmt = $conn->prepare($sql);
-if ($stmt === false) {
-    http_response_code(500);
-    echo json_encode(['status' => 'error', 'message' => 'Gagal mempersiapkan query SQL: ' . $conn->error]);
-    exit();
-}
-
-// Mengikat parameter tahun ke query
-$stmt->bind_param("i", $tahun);
-$stmt->execute();
-$result = $stmt->get_result();
-
-// --- 5. MENGOLAH HASIL DAN MENGIRIMKAN RESPONSE ---
-$data = [];
-if ($result) {
+    // 4. Mengolah hasil query menjadi format yang diinginkan
+    $data = [];
     while ($row = $result->fetch_assoc()) {
-        // Normalisasi nama provinsi ke huruf kapital agar mudah dicocokkan di frontend
-        $nama_provinsi_normal = strtoupper($row['provinsi']);
-        $data[$nama_provinsi_normal] = (float) $row['nilai'];
+        // Menggunakan nama provinsi (dalam huruf kapital) sebagai kunci agar mudah dicocokkan
+        $data[strtoupper($row['provinsi'])] = (float) $row['nilai'];
+    }
+
+    // 5. Menyiapkan response JSON yang akan dikirim ke frontend
+    $response = [
+        "status" => "success",
+        "timestamp" => date("Y-m-d H:i:s"),
+        "filters" => [
+            "tahun" => $tahun,
+            "jenis_data" => $jenis
+        ],
+        "data" => $data
+    ];
+
+    echo json_encode($response, JSON_PRETTY_PRINT);
+
+} catch (Exception $e) {
+    // Jika terjadi error di mana pun dalam blok 'try', kode ini akan dijalankan
+    http_response_code(500); // Set status HTTP ke 500 (Internal Server Error)
+    $errorResponse = [
+        "status" => "error",
+        "timestamp" => date("Y-m-d H:i:s"),
+        "message" => $e->getMessage()
+    ];
+
+    echo json_encode($errorResponse, JSON_PRETTY_PRINT);
+
+} finally {
+    // Blok ini akan selalu dijalankan, baik ada error maupun tidak
+    // Pastikan koneksi database selalu ditutup
+    if (isset($conn) && $conn instanceof mysqli) {
+        $conn->close();
     }
 }
-
-// Menutup statement dan koneksi
-$stmt->close();
-$conn->close();
-
-// Kirim response sukses dalam format JSON yang terstruktur
-echo json_encode([
-    'status' => 'success',
-    'timestamp' => time(),
-    'filters' => ['tahun' => $tahun, 'jenis' => $jenis_data],
-    'data' => $data
-]);
 ?>
