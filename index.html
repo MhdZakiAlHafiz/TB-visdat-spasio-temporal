@@ -3,181 +3,839 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Visualisasi Konstruksi Indonesia</title>
+    <title>Dashboard Konstruksi Indonesia</title>
     <link
       rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
     />
     <style>
-      body {
+      * {
         margin: 0;
-        font-family: Arial, sans-serif;
-        background: #f2f2f2;
+        padding: 0;
+        box-sizing: border-box;
       }
-      h1 {
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        color: #333;
+      }
+
+      .container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+
+      .header {
         text-align: center;
-        background: #005b96;
-        color: white;
-        padding: 10px;
+        margin-bottom: 30px;
+        background: rgba(255, 255, 255, 0.95);
+        padding: 25px;
+        border-radius: 15px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        backdrop-filter: blur(10px);
       }
-      #controls {
+
+      .header h1 {
+        color: #2c3e50;
+        font-size: 2.5em;
+        margin-bottom: 10px;
+        font-weight: 700;
+      }
+
+      .header p {
+        color: #7f8c8d;
+        font-size: 1.1em;
+      }
+
+      .controls {
         display: flex;
         justify-content: center;
-        gap: 10px;
+        gap: 20px;
+        margin-bottom: 25px;
         flex-wrap: wrap;
-        margin: 10px;
+        background: rgba(255, 255, 255, 0.9);
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
       }
+
+      .control-group {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .control-group label {
+        font-weight: 600;
+        color: #2c3e50;
+        font-size: 0.9em;
+      }
+
       select,
       button {
-        padding: 6px;
+        padding: 12px 16px;
         font-size: 16px;
+        border: 2px solid #ddd;
+        border-radius: 8px;
+        background: white;
+        color: #333;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        min-width: 150px;
       }
+
+      select:focus,
+      button:focus {
+        outline: none;
+        border-color: #3498db;
+        box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+      }
+
+      button {
+        background: linear-gradient(45deg, #3498db, #2980b9);
+        color: white;
+        font-weight: 600;
+        border: none;
+        transform: translateY(0);
+      }
+
+      button:hover {
+        background: linear-gradient(45deg, #2980b9, #1f5f99);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(52, 152, 219, 0.3);
+      }
+
+      button:disabled {
+        background: #bdc3c7;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .map-container {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 15px;
+        padding: 20px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        backdrop-filter: blur(10px);
+        margin-bottom: 20px;
+      }
+
       #map {
         height: 600px;
-        margin: 0 auto 20px;
-        width: 95%;
-        border: 2px solid #ccc;
+        border-radius: 10px;
+        border: 3px solid #ecf0f1;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .legend {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: rgba(255, 255, 255, 0.95);
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        z-index: 1000;
+        max-width: 250px;
+        border: 2px solid #ddd;
+      }
+
+      .legend h4 {
+        margin-bottom: 10px;
+        color: #2c3e50;
+        font-size: 1.1em;
+      }
+
+      .legend-item {
+        display: flex;
+        align-items: center;
+        margin-bottom: 5px;
+      }
+
+      .legend-color {
+        width: 20px;
+        height: 20px;
+        margin-right: 10px;
+        border-radius: 3px;
+        border: 1px solid #ddd;
+      }
+
+      .loading {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(255, 255, 255, 0.95);
+        padding: 20px 30px;
+        border-radius: 10px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        z-index: 1000;
+        display: none;
+      }
+
+      .loading.show {
+        display: block;
+      }
+
+      .spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #3498db;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 15px;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      .error {
+        background: #e74c3c;
+        color: white;
+        padding: 15px;
+        border-radius: 8px;
+        margin: 15px 0;
+        display: none;
+      }
+
+      .error.show {
+        display: block;
+      }
+
+      .chart-container {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 15px;
+        padding: 25px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        backdrop-filter: blur(10px);
+        margin-top: 20px;
+      }
+
+      .chart-title {
+        color: #2c3e50;
+        font-size: 1.4em;
+        font-weight: 700;
+        margin-bottom: 20px;
+        text-align: center;
+      }
+
+      .chart {
+        width: 100%;
+        height: 400px;
+      }
+
+      .bar {
+        fill: #3498db;
+        transition: fill 0.3s ease;
+      }
+
+      .bar:hover {
+        fill: #2980b9;
+      }
+
+      .tooltip {
+        position: absolute;
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 10px;
         border-radius: 5px;
+        font-size: 12px;
+        pointer-events: none;
+        z-index: 10000;
+        max-width: 200px;
+      }
+
+      @media (max-width: 768px) {
+        .controls {
+          flex-direction: column;
+          align-items: center;
+        }
+
+        .header h1 {
+          font-size: 2em;
+        }
+
+        #map {
+          height: 400px;
+        }
       }
     </style>
   </head>
   <body>
-    <h1>Visualisasi Geospasial Data Konstruksi Indonesia</h1>
+    <div class="container">
+      <div class="header">
+        <h1>🏗️ Dashboard Konstruksi Indonesia</h1>
+        <p>Visualisasi Data Geospasial Sektor Konstruksi</p>
+      </div>
 
-    <div id="controls">
-      <label for="kategori"
-        >Kategori:
-        <select id="kategori">
-          <option value="upah">Upah Harian</option>
-          <option value="hari_kerja">Hari Kerja</option>
-          <option value="nilai_kontrak">Nilai Kontrak</option>
-        </select>
-      </label>
+      <div class="controls">
+        <div class="control-group">
+          <label for="kategori">📊 Kategori Data</label>
+          <select id="kategori">
+            <option value="upah">💰 Upah Harian Pekerja</option>
+            <option value="hari_kerja">📅 Rata-rata Hari Kerja</option>
+            <option value="nilai_kontrak">📈 Indeks Nilai Kontrak</option>
+          </select>
+        </div>
 
-      <label for="tahun"
-        >Tahun:
-        <select id="tahun">
-          <option value="2023">2023</option>
-          <option value="2022">2022</option>
-          <option value="2021">2021</option>
-        </select>
-      </label>
+        <div class="control-group">
+          <label for="tahun">📆 Tahun Data</label>
+          <select id="tahun">
+            <option value="2023">2023</option>
+            <option value="2022">2022</option>
+            <option value="2021">2021</option>
+            <option value="2020">2020</option>
+          </select>
+        </div>
 
-      <button onclick="loadMap()">Tampilkan</button>
+        <div class="control-group">
+          <label>&nbsp;</label>
+          <button id="loadBtn" onclick="loadMapData()">🔄 Perbarui Data</button>
+        </div>
+      </div>
+
+      <div id="error" class="error"></div>
+
+      <div class="map-container">
+        <div id="map"></div>
+        <div id="loading" class="loading">
+          <div class="spinner"></div>
+          <div>Memuat data...</div>
+        </div>
+        <div class="legend" id="legend"></div>
+      </div>
+
+      <div class="chart-container">
+        <div class="chart-title" id="chartTitle">
+          Top 10 Provinsi - Upah Harian Pekerja
+        </div>
+        <svg class="chart" id="barChart"></svg>
+      </div>
     </div>
 
-    <div id="map"></div>
+    <div class="tooltip" id="tooltip" style="display: none"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
     <script>
-      const map = L.map("map").setView([-2.5, 118], 5);
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: "&copy; OpenStreetMap contributors",
-      }).addTo(map);
+      // Konfigurasi peta
+      const API_BASE_URL = "http://localhost:3000/api";
+      let map,
+        geoLayer,
+        currentData = [],
+        tooltip;
 
-      let geoLayer;
+      // Inisialisasi peta
+      function initMap() {
+        map = L.map("map").setView([-2.5, 118], 5);
 
-      async function loadMap() {
-        const kategori = document.getElementById("kategori").value;
-        const tahun = document.getElementById("tahun").value;
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution:
+            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+          maxZoom: 18,
+        }).addTo(map);
 
-        if (geoLayer) map.removeLayer(geoLayer);
+        // Custom marker untuk Indonesia
+        map.setView([-0.7893, 113.9213], 5);
 
-        try {
-          // Ambil data geojson dan data statistik dari server
-          const [geoRes, dataRes] = await Promise.all([
-            fetch("http://localhost:3000/api/geojson"),
-            fetch(`http://localhost:3000/api/${kategori}?tahun=${tahun}`),
-          ]);
+        // Initialize tooltip
+        tooltip = document.getElementById("tooltip");
+      }
 
-          const geojsonData = await geoRes.json();
-          const data = await dataRes.json();
+      // Fungsi untuk menampilkan loading
+      function showLoading(show = true) {
+        const loading = document.getElementById("loading");
+        const loadBtn = document.getElementById("loadBtn");
 
-          // Buat peta provinsi -> data
-          const dataMap = {};
-          for (const item of data) {
-            if (item.provinsi) {
-              dataMap[item.provinsi.toUpperCase()] = item;
-            }
-          }
-
-          geoLayer = L.layerGroup();
-
-          geojsonData.forEach((region) => {
-            const provKey = region.province?.toUpperCase();
-            const statistik = dataMap[provKey];
-            const value = getValue(statistik, kategori);
-
-            const shape = L.geoJSON(region.geojson, {
-              style: {
-                color: "#000",
-                weight: 1,
-                fillColor: getColor(value, kategori),
-                fillOpacity: 0.7,
-              },
-              onEachFeature: (feature, layer) => {
-                const label = getLabel(kategori);
-                const popup = `
-              <strong>${region.province}</strong><br>
-              Tahun: ${tahun}<br>
-              ${label}: ${value ?? "N/A"}
-            `;
-                layer.bindPopup(popup);
-              },
-            });
-
-            geoLayer.addLayer(shape);
-          });
-
-          geoLayer.addTo(map);
-        } catch (err) {
-          alert(
-            "Gagal memuat data dari server. Pastikan server.js sedang berjalan."
-          );
-          console.error(err);
+        if (show) {
+          loading.classList.add("show");
+          loadBtn.disabled = true;
+          loadBtn.textContent = "⏳ Memuat...";
+        } else {
+          loading.classList.remove("show");
+          loadBtn.disabled = false;
+          loadBtn.textContent = "🔄 Perbarui Data";
         }
       }
 
-      function getValue(row, kategori) {
-        if (!row) return null;
-        if (kategori === "upah") return parseFloat(row.upah);
-        if (kategori === "hari_kerja") return parseInt(row.hari_kerja);
-        if (kategori === "nilai_kontrak") return parseFloat(row.nilai_kontrak);
-        return null;
+      // Fungsi untuk menampilkan error
+      function showError(message) {
+        const errorDiv = document.getElementById("error");
+        errorDiv.textContent = `❌ Error: ${message}`;
+        errorDiv.classList.add("show");
+
+        setTimeout(() => {
+          errorDiv.classList.remove("show");
+        }, 5000);
       }
 
-      function getLabel(kategori) {
-        return (
-          {
-            upah: "Upah Harian (rb)",
-            hari_kerja: "Hari Kerja",
-            nilai_kontrak: "Nilai Kontrak",
-          }[kategori] || "Nilai"
-        );
+      // Fungsi untuk mendapatkan warna berdasarkan nilai
+      function getColor(value, kategori) {
+        if (value === null || value === undefined || isNaN(value)) {
+          return "#d3d3d3"; // Abu-abu untuk data tidak tersedia
+        }
+
+        // Skala warna yang disesuaikan untuk setiap kategori
+        const colorScales = {
+          upah: {
+            ranges: [100, 120, 140, 160, 180],
+            colors: [
+              "#ffffcc",
+              "#c7e9b4",
+              "#7fcdbb",
+              "#41b6c4",
+              "#2c7fb8",
+              "#253494",
+            ],
+          },
+          hari_kerja: {
+            ranges: [80, 100, 120, 140, 160],
+            colors: [
+              "#ffffcc",
+              "#c7e9b4",
+              "#7fcdbb",
+              "#41b6c4",
+              "#2c7fb8",
+              "#253494",
+            ],
+          },
+          nilai_kontrak: {
+            ranges: [90, 110, 130, 150, 170],
+            colors: [
+              "#ffffcc",
+              "#c7e9b4",
+              "#7fcdbb",
+              "#41b6c4",
+              "#2c7fb8",
+              "#253494",
+            ],
+          },
+        };
+
+        const scale = colorScales[kategori];
+        if (!scale) return "#d3d3d3";
+
+        const { ranges, colors } = scale;
+
+        for (let i = 0; i < ranges.length; i++) {
+          if (value <= ranges[i]) {
+            return colors[i];
+          }
+        }
+
+        return colors[colors.length - 1];
       }
 
-      function getColor(val, kategori) {
-        if (val == null || isNaN(val)) return "#ccc";
+      // Fungsi untuk mendapatkan nilai dari data
+      function getValue(dataItem, kategori) {
+        if (!dataItem) return null;
 
-        const scale = {
-          upah: [120, 135, 150, 165],
-          hari_kerja: [100, 120, 130, 140],
-          nilai_kontrak: [110, 130, 150, 170],
-        }[kategori];
-
-        return val > scale[3]
-          ? "#800026"
-          : val > scale[2]
-          ? "#BD0026"
-          : val > scale[1]
-          ? "#E31A1C"
-          : val > scale[0]
-          ? "#FC4E2A"
-          : "#FFEDA0";
+        switch (kategori) {
+          case "upah":
+            return dataItem.upah ? parseFloat(dataItem.upah) : null;
+          case "hari_kerja":
+            return dataItem.hari_kerja ? parseInt(dataItem.hari_kerja) : null;
+          case "nilai_kontrak":
+            return dataItem.nilai_kontrak
+              ? parseFloat(dataItem.nilai_kontrak)
+              : null;
+          default:
+            return null;
+        }
       }
 
-      // Load awal saat halaman dibuka
-      loadMap();
+      // Fungsi untuk mendapatkan label kategori
+      function getCategoryLabel(kategori) {
+        const labels = {
+          upah: "Upah Harian (Ribu Rupiah)",
+          hari_kerja: "Hari Kerja per Bulan",
+          nilai_kontrak: "Indeks Nilai Kontrak",
+        };
+        return labels[kategori] || "Nilai";
+      }
+
+      // Fungsi untuk mencocokkan nama provinsi
+      function matchProvinceName(geoProvince, dataProvince) {
+        if (!geoProvince || !dataProvince) return false;
+
+        const normalize = (str) =>
+          str
+            .toLowerCase()
+            .replace(/\s+/g, " ")
+            .replace(/^(provinsi|prov\.?)\s+/i, "")
+            .replace(/\s+(province|prov\.?)$/i, "")
+            .trim();
+
+        return normalize(geoProvince) === normalize(dataProvince);
+      }
+
+      // Fungsi untuk membuat legenda
+      function createLegend(kategori, data) {
+        const legendDiv = document.getElementById("legend");
+        const label = getCategoryLabel(kategori);
+
+        // Hitung rentang nilai dari data aktual
+        const values = data
+          .map((item) => getValue(item, kategori))
+          .filter((v) => v !== null);
+        const minVal = Math.min(...values);
+        const maxVal = Math.max(...values);
+
+        const colorScales = {
+          upah: {
+            ranges: [100, 120, 140, 160, 180],
+            colors: [
+              "#ffffcc",
+              "#c7e9b4",
+              "#7fcdbb",
+              "#41b6c4",
+              "#2c7fb8",
+              "#253494",
+            ],
+          },
+          hari_kerja: {
+            ranges: [80, 100, 120, 140, 160],
+            colors: [
+              "#ffffcc",
+              "#c7e9b4",
+              "#7fcdbb",
+              "#41b6c4",
+              "#2c7fb8",
+              "#253494",
+            ],
+          },
+          nilai_kontrak: {
+            ranges: [90, 110, 130, 150, 170],
+            colors: [
+              "#ffffcc",
+              "#c7e9b4",
+              "#7fcdbb",
+              "#41b6c4",
+              "#2c7fb8",
+              "#253494",
+            ],
+          },
+        };
+
+        const scale = colorScales[kategori];
+
+        let legendHTML = `<h4>📊 ${label}</h4>`;
+
+        // Tambahkan item legenda
+        for (let i = 0; i < scale.ranges.length; i++) {
+          const range =
+            i === 0
+              ? `< ${scale.ranges[i]}`
+              : i === scale.ranges.length - 1
+              ? `> ${scale.ranges[i - 1]}`
+              : `${scale.ranges[i - 1]} - ${scale.ranges[i]}`;
+
+          legendHTML += `
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: ${scale.colors[i]}"></div>
+                        <span>${range}</span>
+                    </div>
+                `;
+        }
+
+        // Tambahkan warna untuk data tidak tersedia
+        legendHTML += `
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #d3d3d3"></div>
+                    <span>Data tidak tersedia</span>
+                </div>
+            `;
+
+        legendDiv.innerHTML = legendHTML;
+      }
+
+      // Fungsi untuk membuat bar chart
+      function createBarChart(data, kategori) {
+        const chartTitle = document.getElementById("chartTitle");
+        const svg = d3.select("#barChart");
+
+        // Clear previous chart
+        svg.selectAll("*").remove();
+
+        // Filter and sort data to get top 10
+        const validData = data
+          .map((item) => ({
+            provinsi: item.provinsi,
+            value: getValue(item, kategori),
+          }))
+          .filter((item) => item.value !== null && !isNaN(item.value))
+          .sort((a, b) => b.value - a.value)
+          .slice(0, 10);
+
+        if (validData.length === 0) {
+          chartTitle.textContent = "Tidak ada data untuk ditampilkan";
+          return;
+        }
+
+        // Update chart title
+        const titles = {
+          upah: "Top 10 Provinsi - Upah Harian Pekerja Tertinggi",
+          hari_kerja: "Top 10 Provinsi - Hari Kerja Terbanyak",
+          nilai_kontrak: "Top 10 Provinsi - Indeks Nilai Kontrak Tertinggi",
+        };
+        chartTitle.textContent = titles[kategori];
+
+        // Set dimensions and margins
+        const container = document.getElementById("barChart");
+        const containerWidth = container.clientWidth;
+        const margin = { top: 20, right: 30, bottom: 80, left: 60 };
+        const width = containerWidth - margin.left - margin.right;
+        const height = 400 - margin.top - margin.bottom;
+
+        // Set SVG dimensions
+        svg.attr("width", containerWidth).attr("height", 400);
+
+        const g = svg
+          .append("g")
+          .attr("transform", `translate(${margin.left},${margin.top})`);
+
+        // Create scales
+        const x = d3
+          .scaleBand()
+          .domain(validData.map((d) => d.provinsi))
+          .range([0, width])
+          .padding(0.1);
+
+        const y = d3
+          .scaleLinear()
+          .domain([0, d3.max(validData, (d) => d.value)])
+          .nice()
+          .range([height, 0]);
+
+        // Create color scale
+        const colorScale = d3
+          .scaleSequential(d3.interpolateBlues)
+          .domain([0, validData.length - 1]);
+
+        // Create bars
+        g.selectAll(".bar")
+          .data(validData)
+          .enter()
+          .append("rect")
+          .attr("class", "bar")
+          .attr("x", (d) => x(d.provinsi))
+          .attr("width", x.bandwidth())
+          .attr("y", (d) => y(d.value))
+          .attr("height", (d) => height - y(d.value))
+          .attr("fill", (d, i) => colorScale(i))
+          .on("mouseover", function (event, d) {
+            d3.select(this).attr("opacity", 0.8);
+
+            const unit =
+              kategori === "upah"
+                ? "ribu rupiah"
+                : kategori === "hari_kerja"
+                ? "hari"
+                : "poin";
+
+            tooltip.innerHTML = `
+                        <strong>${d.provinsi}</strong><br>
+                        ${getCategoryLabel(kategori)}: ${d.value.toFixed(
+              1
+            )} ${unit}
+                    `;
+            tooltip.style.display = "block";
+            tooltip.style.left = event.pageX + 10 + "px";
+            tooltip.style.top = event.pageY - 10 + "px";
+          })
+          .on("mouseout", function () {
+            d3.select(this).attr("opacity", 1);
+            tooltip.style.display = "none";
+          });
+
+        // Add X axis
+        g.append("g")
+          .attr("transform", `translate(0,${height})`)
+          .call(d3.axisBottom(x))
+          .selectAll("text")
+          .style("text-anchor", "end")
+          .attr("dx", "-.8em")
+          .attr("dy", ".15em")
+          .attr("transform", "rotate(-45)")
+          .style("font-size", "11px");
+
+        // Add Y axis
+        g.append("g").call(d3.axisLeft(y)).style("font-size", "11px");
+
+        // Add Y axis label
+        g.append("text")
+          .attr("transform", "rotate(-90)")
+          .attr("y", 0 - margin.left)
+          .attr("x", 0 - height / 2)
+          .attr("dy", "1em")
+          .style("text-anchor", "middle")
+          .style("font-size", "12px")
+          .style("fill", "#666")
+          .text(getCategoryLabel(kategori));
+      }
+
+      // Fungsi utama untuk memuat data peta
+      async function loadMapData() {
+        const kategori = document.getElementById("kategori").value;
+        const tahun = document.getElementById("tahun").value;
+
+        showLoading(true);
+
+        // Hapus layer sebelumnya
+        if (geoLayer) {
+          map.removeLayer(geoLayer);
+        }
+
+        try {
+          // Fetch data dari API
+          const [geoResponse, dataResponse] = await Promise.all([
+            fetch(`${API_BASE_URL}/geojson`),
+            fetch(`${API_BASE_URL}/${kategori}?tahun=${tahun}`),
+          ]);
+
+          if (!geoResponse.ok || !dataResponse.ok) {
+            throw new Error("Gagal mengambil data dari server");
+          }
+
+          const geojsonData = await geoResponse.json();
+          const statisticData = await dataResponse.json();
+
+          currentData = statisticData;
+
+          // Buat mapping data berdasarkan provinsi
+          const dataMap = new Map();
+          statisticData.forEach((item) => {
+            if (item.provinsi) {
+              dataMap.set(item.provinsi.toLowerCase().trim(), item);
+            }
+          });
+
+          // Buat layer peta
+          geoLayer = L.layerGroup();
+
+          geojsonData.forEach((region) => {
+            if (!region.geojson) return;
+
+            // Cari data yang cocok
+            let matchedData = null;
+            const geoProvince = region.province?.toLowerCase().trim();
+
+            // Coba berbagai variasi nama provinsi
+            for (const [key, data] of dataMap.entries()) {
+              if (
+                geoProvince === key ||
+                geoProvince?.includes(key) ||
+                key?.includes(geoProvince)
+              ) {
+                matchedData = data;
+                break;
+              }
+            }
+
+            const value = getValue(matchedData, kategori);
+            const color = getColor(value, kategori);
+
+            const geoJSONLayer = L.geoJSON(region.geojson, {
+              style: {
+                fillColor: color,
+                weight: 2,
+                opacity: 1,
+                color: "white",
+                dashArray: "3",
+                fillOpacity: 0.8,
+              },
+              onEachFeature: (feature, layer) => {
+                const label = getCategoryLabel(kategori);
+                const displayValue =
+                  value !== null
+                    ? `${value.toFixed(1)} ${
+                        kategori === "upah"
+                          ? "ribu rupiah"
+                          : kategori === "hari_kerja"
+                          ? "hari"
+                          : "poin"
+                      }`
+                    : "Data tidak tersedia";
+
+                // Hover effects with tooltip
+                layer.on("mouseover", function (e) {
+                  const layer = e.target;
+                  layer.setStyle({
+                    weight: 3,
+                    color: "#ff6b6b",
+                    dashArray: "",
+                    fillOpacity: 0.9,
+                  });
+                  layer.bringToFront();
+
+                  // Show tooltip
+                  tooltip.innerHTML = `
+                                    <div style="font-family: Arial, sans-serif;">
+                                        <h4 style="margin: 0 0 8px 0; color: white;">
+                                            🏛️ ${region.province}
+                                        </h4>
+                                        <p style="margin: 4px 0;"><strong>📅 Tahun:</strong> ${tahun}</p>
+                                        <p style="margin: 4px 0;"><strong>📊 ${label}:</strong> ${displayValue}</p>
+                                    </div>
+                                `;
+                  tooltip.style.display = "block";
+                });
+
+                layer.on("mouseout", function (e) {
+                  geoJSONLayer.resetStyle(e.target);
+                  tooltip.style.display = "none";
+                });
+
+                layer.on("mousemove", function (e) {
+                  tooltip.style.left = e.originalEvent.pageX + 10 + "px";
+                  tooltip.style.top = e.originalEvent.pageY - 10 + "px";
+                });
+              },
+            });
+
+            geoLayer.addLayer(geoJSONLayer);
+          });
+
+          geoLayer.addTo(map);
+
+          // Buat legenda dan bar chart
+          createLegend(kategori, statisticData);
+          createBarChart(statisticData, kategori);
+        } catch (error) {
+          console.error("Error loading map data:", error);
+          showError(
+            "Gagal memuat data. Pastikan server berjalan di localhost:3000"
+          );
+        } finally {
+          showLoading(false);
+        }
+      }
+
+      // Event listeners
+      document.addEventListener("DOMContentLoaded", function () {
+        initMap();
+        loadMapData(); // Load initial data
+
+        // Auto-reload when selection changes
+        document
+          .getElementById("kategori")
+          .addEventListener("change", loadMapData);
+        document
+          .getElementById("tahun")
+          .addEventListener("change", loadMapData);
+      });
     </script>
   </body>
 </html>
