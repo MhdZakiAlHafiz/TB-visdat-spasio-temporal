@@ -40,9 +40,8 @@ foreach ($geojson['features'] as $feature) {
         continue;
     }
 
-    // Ambil nama provinsi dan ubah ke format Capital Each Word
-    $provinceRaw = $feature['properties']['PROVINSI'] ??
-        $feature['properties']['provinsi'] ?? null;
+    // Ambil nama provinsi
+    $provinceRaw = $feature['properties']['PROVINSI'] ?? $feature['properties']['provinsi'] ?? null;
 
     if (!$provinceRaw) {
         continue;
@@ -50,9 +49,17 @@ foreach ($geojson['features'] as $feature) {
 
     $provinceName = ucwords(strtolower(trim($provinceRaw)));
 
-    // Ambil geometri dalam format GeoJSON
-    $geometry = $feature['geometry'];
-    $geojson_text = json_encode($geometry, JSON_UNESCAPED_UNICODE);
+    // Buat format GeoJSON lengkap (Feature)
+    $feature_object = [
+        "type" => "Feature",
+        "geometry" => $feature['geometry'],
+        "properties" => [
+            "province" => $provinceName
+        ]
+    ];
+
+    // Konversi ke JSON
+    $geojson_text = json_encode($feature_object, JSON_UNESCAPED_UNICODE);
 
     // Simpan ke tabel
     $stmt = $conn->prepare("INSERT INTO provinsiind_geojson (province, geojson) VALUES (?, ?)");
@@ -71,6 +78,6 @@ foreach ($geojson['features'] as $feature) {
     $stmt->close();
 }
 
-echo "Berhasil menyimpan $count data provinsi ke database.";
+echo "✅ Berhasil menyimpan $count data provinsi ke database.";
 $conn->close();
 ?>
