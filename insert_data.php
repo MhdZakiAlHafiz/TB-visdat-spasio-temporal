@@ -42,7 +42,6 @@ foreach ($geojson['features'] as $feature) {
 
     // Ambil nama provinsi
     $provinceRaw = $feature['properties']['PROVINSI'] ?? $feature['properties']['provinsi'] ?? null;
-
     if (!$provinceRaw) {
         continue;
     }
